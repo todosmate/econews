@@ -376,6 +376,31 @@ def main():
     out.write_text(json.dumps(issue, ensure_ascii=False, indent=1), encoding="utf-8")
     update_index()
     print(f"{issue_id} 생성 완료 ({len(articles)}건)")
+    write_notify(issue)
+
+
+def write_notify(issue: dict):
+    """휴대폰 알림(ntfy)용 메시지를 notify.json으로 저장. 전송은 워크플로가 담당."""
+    topic = os.environ.get("NTFY_TOPIC")
+    if not topic:
+        return
+    ed = "조간" if issue["edition"] == "am" else "석간"
+    m, d = issue["date"][5:7].lstrip("0"), issue["date"][8:].lstrip("0")
+    counts = {}
+    for a in issue["articles"]:
+        counts[a["blog"]] = counts.get(a["blog"], 0) + 1
+    lines = [f"· {b} {n}건" for b, n in counts.items()]
+    star = [a["title"] for a in issue["articles"] if a.get("summary_by")]
+    if star:
+        lines.insert(0, "★ " + " / ".join(star))
+    base = os.environ.get("SITE_URL", "https://todosmate.github.io/econews/")
+    (ROOT / "notify.json").write_text(json.dumps({
+        "topic": topic,
+        "title": f"econews {m}/{d} {ed} · {len(issue['articles'])}건",
+        "message": "\n".join(lines),
+        "click": f"{base}?issue={issue['id']}",
+        "tags": ["newspaper"],
+    }, ensure_ascii=False), encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -2,8 +2,16 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>econews 블로그 신문</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#8a1c1c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="econews">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
   :root { --bg:#faf8f3; --fg:#1d1d1b; --muted:#6b6b66; --line:#d9d4c7; --card:#fff; --accent:#8a1c1c; }
   @media (prefers-color-scheme: dark) {
@@ -13,7 +21,7 @@
   body { margin:0; background:var(--bg); color:var(--fg); line-height:1.65;
          font-family:"Noto Serif KR","Apple SD Gothic Neo","Malgun Gothic",serif; }
   .wrap { max-width:900px; margin:0 auto; padding:0 16px 48px; }
-  header { text-align:center; padding:28px 0 14px; border-bottom:3px double var(--fg); }
+  header { text-align:center; padding:calc(28px + env(safe-area-inset-top)) 0 14px; border-bottom:3px double var(--fg); }
   header h1 { margin:0; font-size:2rem; letter-spacing:.08em; }
   header p { margin:4px 0 0; color:var(--muted); font-size:.9rem; }
   .layout { display:grid; grid-template-columns:1fr 200px; gap:28px; margin-top:20px; }
@@ -94,6 +102,7 @@ async function main() {
         <div class="time">${hm(a.published)} · <a href="${esc(a.url)}" target="_blank" rel="noopener">원문 보기</a></div>
       </article>`).join("")}`;
 }
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 main().catch(e => { $("#main").innerHTML = `<div class="empty">오류: ${esc(e.message)}</div>`; });
 </script>
 </body>

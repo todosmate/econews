@@ -39,6 +39,7 @@ jobs:
       - name: Build issue
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           IN_DATE: ${{ github.event.inputs.date }}
           IN_EDITION: ${{ github.event.inputs.edition }}
           IN_FORCE: ${{ github.event.inputs.force }}
@@ -57,3 +58,8 @@ jobs:
           git commit -m "issue: $(date -u +%Y-%m-%dT%H:%MZ)"
           git pull --rebase
           git push
+      - name: Notify phone (ntfy)
+        if: hashFiles('notify.json') != ''
+        run: |
+          sleep 90   # GitHub Pages 반영 대기 후 알림
+          curl -sS -H "Content-Type: application/json" --data-binary @notify.json https://ntfy.sh/ || echo "알림 전송 실패(발행에는 영향 없음)"
