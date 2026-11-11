@@ -101,11 +101,12 @@ econews/
 - [x] 계획 문서 작성 (PROJECT.md)
 - [x] 블로그 확정: `ranto28`(메르의 블로그), `red_annie`(그냥 아지매) → blogs.json
 - [x] 코드 작성: scripts/build_issue.py (수집+필터+본문+요약+저장 통합), docs/index.html, .github/workflows/publish.yml
-- [ ] **이 PC에 git / python 미설치** → git(+gh) 설치 필요 (python은 Actions에서 실행되므로 로컬엔 선택)
-- [ ] GitHub 저장소 `econews` 생성 (공개) 후 첫 push
-- [ ] Settings → Pages → Source: Deploy from branch / `main` / `/docs`
-- [ ] Settings → Secrets → `ANTHROPIC_API_KEY` 등록
-- [ ] Actions 탭에서 publish-issue 수동 실행(workflow_dispatch)으로 end-to-end 검증
+- [x] git / gh 설치 (git: `C:\Program Files\Git\cmd`, gh: `%LOCALAPPDATA%\Programs\gh\bin` — PATH 미등록이라 세션마다 `$env:Path` 추가 필요). python은 로컬에 없음(Actions에서만 실행)
+- [x] 저장소 https://github.com/todosmate/econews (공개) 생성 및 push, gh 로그인(workflow 권한 포함)
+- [x] Pages 설정 완료: main / docs → https://todosmate.github.io/econews/
+- [x] Actions 수동 실행으로 수집·필터·JSON 생성·커밋 동작 확인 (API 키 없이 발췌문 요약 상태)
+- [ ] **Settings → Secrets and variables → Actions → `ANTHROPIC_API_KEY` 등록** (미완료: 현재 요약이 발췌문으로 대체됨)
+- [ ] 키 등록 후 `gh workflow run publish-issue -f edition=am -f force=true` 로 Claude 요약 검증
 - [ ] 스케줄 동작 확인 (조간/석간 각 1회)
 - [ ] (추후) 블로그 추가는 blogs.json에 한 줄 추가
 
