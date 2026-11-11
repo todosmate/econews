@@ -1,4 +1,8 @@
 [
   { "id": "ranto28", "name": "메르의 블로그", "summarize": true, "comment_marker": "한줄 코멘트" },
-  { "id": "red_annie", "name": "그냥 아지매" }
+  { "id": "red_annie", "name": "그냥 아지매" },
+  { "id": "pillion21", "name": "알바트로스의 파생 이야기" },
+  { "id": "pjws3", "name": "주부이야기" },
+  { "id": "pokara61", "name": "포카라의 실전투자" },
+  { "id": "gentlenavy", "name": "젠네의 블로그" }
 ]
