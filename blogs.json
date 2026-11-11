@@ -1,4 +1,4 @@
 [
-  { "id": "ranto28", "name": "메르의 블로그" },
+  { "id": "ranto28", "name": "메르의 블로그", "comment_marker": "한줄 코멘트" },
   { "id": "red_annie", "name": "그냥 아지매" }
 ]

@@ -9,6 +9,8 @@ import json
 import os
 import re
 import sys
+import time
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
@@ -62,7 +64,7 @@ def fetch_feed(blog: dict, start, end):
 
 
 def fetch_body(item: dict) -> str:
-    """글 본문 텍스트. 실패 시 RSS 발췌문으로 대체."""
+    """글 본문 전체 텍스트(줄 단위). 실패 시 RSS 발췌문으로 대체."""
     url = (f"https://blog.naver.com/PostView.naver?blogId={item['blog_id']}"
            f"&logNo={item['log_no']}&redirect=Dlog&widgetTypeCall=true&directAccess=false")
     try:
@@ -71,30 +73,83 @@ def fetch_body(item: dict) -> str:
                 or soup.select_one(".post-view"))
         text = node.get_text("\n", strip=True) if node else ""
         if len(text) > 100:
-            return text[:MAX_BODY]
+            return text
     except Exception as e:  # noqa: BLE001
         print(f"  본문 수집 실패({item['url']}): {e}", file=sys.stderr)
     return item["excerpt"]
 
 
+def extract_comment(body: str, marker: str) -> str:
+    """본문에서 marker(예: '한줄 코멘트')로 시작하는 마지막 문단을 원문 그대로 추출."""
+    pat = re.compile(r"^\s*" + r"\s?".join(map(re.escape, marker.replace(" ", ""))))
+    lines = [ln.replace("​", "").strip() for ln in body.split("\n")]
+    lines = [ln for ln in lines if ln]
+    idx = [i for i, ln in enumerate(lines) if pat.match(ln)]
+    if not idx:
+        return ""
+    i = idx[-1]
+    text = pat.sub("", lines[i]).lstrip(" .:：-")
+    # 마커만 있는 줄이면 다음 줄을 본문으로 사용
+    j = i + 1
+    while len(text) < 5 and j < len(lines):
+        text = (text + " " + lines[j]).strip()
+        j += 1
+    return text
+
+
 class Summarizer:
+    """우선순위: ANTHROPIC_API_KEY(Claude) → GITHUB_TOKEN(GitHub Models) → 발췌문."""
+
+    GH_URL = "https://models.github.ai/inference/chat/completions"
+
     def __init__(self):
-        key = os.environ.get("ANTHROPIC_API_KEY")
-        self.client = None
-        if key:
+        self.provider = None
+        if os.environ.get("ANTHROPIC_API_KEY"):
             import anthropic
-            self.client = anthropic.Anthropic(api_key=key)
-        else:
-            print("ANTHROPIC_API_KEY 없음 → 발췌문으로 대체", file=sys.stderr)
+            self.client = anthropic.Anthropic()
+            self.provider = "claude"
+        elif os.environ.get("GITHUB_TOKEN"):
+            self.provider = "github"
+            self.gh_models = [m.strip() for m in os.environ.get(
+                "ECONEWS_GH_MODELS", "openai/gpt-4.1-mini,openai/gpt-4o-mini").split(",") if m.strip()]
+        print(f"요약 방식: {self.provider or '발췌문(대체)'}")
+
+    def _ask_github(self, prompt: str, max_tokens: int) -> str:
+        last = None
+        for model in self.gh_models:
+            body = json.dumps({"model": model, "max_tokens": max_tokens, "temperature": 0.3,
+                               "messages": [{"role": "user", "content": prompt}]}).encode()
+            req = urllib.request.Request(self.GH_URL, data=body, method="POST", headers={
+                "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                "Content-Type": "application/json", "Accept": "application/json"})
+            for attempt in range(3):
+                try:
+                    with urllib.request.urlopen(req, timeout=90) as r:
+                        j = json.loads(r.read().decode())
+                    time.sleep(3)  # 분당 요청 한도 여유
+                    return j["choices"][0]["message"]["content"].strip()
+                except urllib.error.HTTPError as e:
+                    last = f"{model} HTTP {e.code}: {e.read()[:300]!r}"
+                    if e.code == 429:
+                        time.sleep(30 * (attempt + 1))
+                        continue
+                    break  # 다른 오류 → 다음 모델
+                except Exception as e:  # noqa: BLE001
+                    last = f"{model}: {e}"
+                    break
+        raise RuntimeError(last)
 
     def _ask(self, prompt: str, max_tokens: int) -> str:
+        if self.provider == "github":
+            return self._ask_github(prompt, max_tokens)
         msg = self.client.messages.create(
             model=MODEL, max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}])
         return "".join(b.text for b in msg.content if b.type == "text").strip()
 
     def article(self, item: dict, body: str) -> str:
-        if not self.client:
+        body = body[:MAX_BODY]
+        if not self.provider:
             return item["excerpt"][:200]
         try:
             return self._ask(
@@ -106,7 +161,7 @@ class Summarizer:
             return item["excerpt"][:200]
 
     def overview(self, articles: list) -> str:
-        if not self.client:
+        if not self.provider:
             return ""
         lines = "\n".join(f"- [{a['blog']}] {a['title']}: {a['summary']}" for a in articles)
         try:
@@ -165,14 +220,21 @@ def main():
         print("새 글 없음 → 호 생성 안 함")
         return
 
+    markers = {b["id"]: b.get("comment_marker") for b in blogs}
     s = Summarizer()
     articles = []
     for it in items:
         body = fetch_body(it)
-        articles.append({
+        art = {
             "blog": it["blog"], "title": it["title"], "url": it["url"],
             "published": it["published"], "summary": s.article(it, body),
-        })
+        }
+        marker = markers.get(it["blog_id"])
+        if marker:
+            art["comment"] = extract_comment(body, marker)
+            if not art["comment"]:
+                print(f"  '{marker}' 없음: {it['title']}")
+        articles.append(art)
 
     issue = {
         "id": issue_id, "date": date, "edition": edition,
