@@ -222,7 +222,7 @@ class Gemini:
                 except urllib.error.HTTPError as e:
                     last = f"{m} HTTP {e.code}: {e.read()[:300]!r}"
                     print(f"    gemini {last[:200]} ({time.time() - t0:.0f}초)")
-                    if e.code == 429 and attempt == 0:
+                    if e.code in (429, 500, 503) and attempt == 0:  # 한도·일시 과부하 → 30초 뒤 1회 재시도
                         time.sleep(30)
                         continue
                     if e.code in (404, 429, 403):  # 없는 모델/한도 소진 → 이후엔 다음 모델 사용
