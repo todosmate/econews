@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "docs" / "data"
 ISSUES = DATA / "issues"
 UA = "Mozilla/5.0 (compatible; econews-bot)"
-MAX_BODY = 6000
+MAX_BODY = 30000  # 요약 시 모델에 넣는 본문 최대 글자 수
 
 
 def http_get(url: str) -> str:
@@ -91,21 +91,23 @@ def fetch_body(item: dict) -> str:
 
 
 def extract_comment(body: str, marker: str) -> str:
-    """본문에서 marker(예: '한줄 코멘트')로 시작하는 마지막 문단을 원문 그대로 추출."""
+    """본문에서 marker(예: '한줄 코멘트')로 시작하는 마지막 문단부터, 빈 줄이 나올 때까지의
+    문단들을 원문 그대로(마커 포함) 발췌한다."""
     pat = re.compile(r"^\s*" + r"\s?".join(map(re.escape, marker.replace(" ", ""))))
-    lines = [ln.replace("​", "").strip() for ln in body.split("\n")]
-    lines = [ln for ln in lines if ln]
+    lines = [ln.replace("​", "").strip() for ln in body.split("\n")]  # 빈 줄 유지
     idx = [i for i, ln in enumerate(lines) if pat.match(ln)]
     if not idx:
         return ""
-    i = idx[-1]
-    text = pat.sub("", lines[i]).lstrip(" .:：-")
-    # 마커만 있는 줄이면 다음 줄을 본문으로 사용
-    j = i + 1
-    while len(text) < 5 and j < len(lines):
-        text = (text + " " + lines[j]).strip()
-        j += 1
-    return text
+    out = []
+    for ln in lines[idx[-1]:]:
+        if not ln:
+            if len(out) == 1 and len(pat.sub("", out[0]).strip(" .:：-")) < 5:
+                continue  # '한줄 코멘트' 제목만 있는 줄이면 다음 문단까지 포함
+            break
+        if out and (ln.startswith(("PS)", "P.S", "http")) or "©" in ln or re.search(r"네이버\s?블로그$", ln)):
+            break
+        out.append(ln)
+    return "\n".join(out)
 
 
 def clean_lines(body: str) -> list:
@@ -114,12 +116,11 @@ def clean_lines(body: str) -> list:
 
 
 def target_length(body: str):
-    """본문 길이에 비례한 요약 분량: (문장 수, 글자 수). 본문의 약 15%, 3~15문장."""
+    """본문 길이에 비례한 요약 분량: (문장 수, 최소 글자, 최대 글자). 본문의 1/3 ~ 1/2."""
     n = len("".join(clean_lines(body)))
-    floor = min(250, int(n * 0.5))  # 짧은 글은 본문 절반을 넘지 않게
-    chars = max(floor, min(1500, int(n * 0.15)))
-    sents = max(1 if n < 400 else 3, min(15, round(chars / 90)))
-    return sents, chars
+    lo, hi = n // 3, n // 2
+    sents = max(1 if n < 400 else 3, round((lo + hi) / 2 / 80))
+    return sents, lo, hi
 
 
 # ---------- 추출 요약 (키 불필요) ----------
@@ -262,14 +263,17 @@ class Summarizer:
 
     @staticmethod
     def _prompt(item, body):
-        k, chars = target_length(body)
+        _, lo, hi = target_length(body)
         return (
             f"다음 블로그 글을 한국어로 요약하세요.\n"
-            f"- 분량: 약 {k}문장, {chars}자 내외 (본문 길이에 맞춘 분량이니 지켜주세요)\n"
-            f"- 글쓴이의 핵심 주장, 근거가 되는 수치·사실, 결론을 빠짐없이 담으세요.\n"
-            f"- 내용이 바뀌는 부분은 줄바꿈으로 문단을 나누세요.\n"
+            f"- 분량: 본문의 1/3~1/2 수준인 {lo}~{hi}자. 짧게 줄이면 논리가 비약되므로 반드시 이 분량을 채우세요.\n"
+            f"- 글의 전개 순서를 따라가며, 글쓴이의 주장과 그 근거(수치·사실·사례), 중간 논리, 결론을 "
+            f"생략 없이 이어지게 쓰세요.\n"
+            f"- 내용이 바뀌는 부분은 빈 줄로 문단을 나누세요.\n"
+            f"- '한줄 코멘트'로 시작하는 맺음말은 따로 표시되므로 요약에 넣지 마세요.\n"
+            f"- ~~ ~~ 로 감싼 부분은 글쓴이가 취소선을 그은 농담이니 요약에서 빼세요.\n"
             f"- 인사말·머리말 없이 요약문만 출력하세요. 마크다운 기호(#, *, -)는 쓰지 마세요.\n\n"
-            f"제목: {item['title']}\n본문:\n{body[:MAX_BODY * 2]}")
+            f"제목: {item['title']}\n본문:\n{body[:MAX_BODY]}")
 
     def article(self, item: dict, body: str):
         """(요약문, 방식) 반환. 방식: gemini | extractive"""

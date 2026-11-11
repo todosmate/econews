@@ -27,7 +27,7 @@
   .card h3 a { color:inherit; text-decoration:none; }
   .card h3 a:hover { text-decoration:underline; }
   .card p { margin:0 0 6px; white-space:pre-wrap; }
-  .card .comment { margin:8px 0; padding:8px 12px; background:var(--bg); border-left:3px solid var(--accent); font-size:.95rem; }
+  .card .comment { margin:8px 0; padding:8px 12px; background:var(--bg); border-left:3px solid var(--accent); font-size:.95rem; white-space:pre-wrap; }
   .card .comment b { color:var(--accent); margin-right:6px; }
   .card .len { color:var(--muted); font-weight:400; margin-left:6px; }
   .card .preview { color:var(--fg); opacity:.85; }
@@ -90,7 +90,7 @@ async function main() {
         <div class="blog">${esc(a.blog)}${a.length ? ` <span class="len">본문 ${a.length.toLocaleString()}자</span>` : ""}</div>
         <h3><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a></h3>
         ${body(a)}
-        ${a.comment ? `<div class="comment"><b>한줄 코멘트</b> ${rich(a.comment)}</div>` : ""}
+        ${a.comment ? `<div class="comment">${rich(a.comment)}</div>` : ""}
         <div class="time">${hm(a.published)} · <a href="${esc(a.url)}" target="_blank" rel="noopener">원문 보기</a></div>
       </article>`).join("")}`;
 }
