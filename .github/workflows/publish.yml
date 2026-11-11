@@ -38,7 +38,6 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Build issue
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           IN_DATE: ${{ github.event.inputs.date }}
           IN_EDITION: ${{ github.event.inputs.edition }}

@@ -24,7 +24,6 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "docs" / "data"
 ISSUES = DATA / "issues"
 UA = "Mozilla/5.0 (compatible; econews-bot)"
-MODEL = os.environ.get("ECONEWS_MODEL", "claude-haiku-5-5")
 MAX_BODY = 6000
 
 
@@ -224,22 +223,30 @@ class Gemini:
         raise RuntimeError(last)
 
 
+def preview(body: str, max_lines: int = 5, max_chars: int = 400) -> str:
+    """요약하지 않는 블로그: 본문 앞부분 4~5줄을 그대로 보여준다."""
+    out, total = [], 0
+    for ln in clean_lines(body):
+        if "©" in ln or "출처 OGQ" in ln or ln.startswith("http"):
+            continue
+        if total + len(ln) > max_chars and out:
+            break
+        out.append(ln)
+        total += len(ln)
+        if len(out) >= max_lines:
+            break
+    return "\n".join(out)
+
+
 class Summarizer:
-    """요약 방식: extractive(항상) + gemini(GEMINI_API_KEY 있으면) + claude(ANTHROPIC_API_KEY 있으면).
-    여러 방식을 모두 저장해 화면에서 비교한다. 대표 요약(summary)은 claude > gemini > extractive."""
+    """blogs.json에서 "summarize": true 인 블로그 글만 Gemini로 요약한다.
+    Gemini 실패(키 없음·한도 초과 등) 시 추출 요약으로 대체."""
 
     def __init__(self):
-        self.llms = {}
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            import anthropic
-            client = anthropic.Anthropic()
-            self.llms["claude"] = lambda p: "".join(
-                b.text for b in client.messages.create(
-                    model=MODEL, max_tokens=4096, messages=[{"role": "user", "content": p}]).content
-                if b.type == "text").strip()
-        if os.environ.get("GEMINI_API_KEY"):
-            self.llms["gemini"] = Gemini(os.environ["GEMINI_API_KEY"]).ask
-        print(f"요약 방식: extractive + {list(self.llms) or '없음'}")
+        key = os.environ.get("GEMINI_API_KEY")
+        self.gemini = Gemini(key) if key else None
+        if not key:
+            print("GEMINI_API_KEY 없음 → 추출 요약으로 대체", file=sys.stderr)
 
     @staticmethod
     def _prompt(item, body):
@@ -252,34 +259,27 @@ class Summarizer:
             f"- 인사말·머리말 없이 요약문만 출력하세요. 마크다운 기호(#, *, -)는 쓰지 마세요.\n\n"
             f"제목: {item['title']}\n본문:\n{body[:MAX_BODY * 2]}")
 
-    def article(self, item: dict, body: str) -> dict:
-        out = {"extractive": extractive_summary(body, item["title"]) or item["excerpt"][:300]}
-        prompt = self._prompt(item, body)
-        for name, ask in self.llms.items():
+    def article(self, item: dict, body: str):
+        """(요약문, 방식) 반환. 방식: gemini | extractive"""
+        if self.gemini:
             try:
-                out[name] = ask(prompt)
+                return self.gemini.ask(self._prompt(item, body)), "gemini"
             except Exception as e:  # noqa: BLE001
-                print(f"  {name} 요약 실패({item['url']}): {e}", file=sys.stderr)
-        return out
+                print(f"  gemini 요약 실패({item['url']}): {e}", file=sys.stderr)
+        return extractive_summary(body, item["title"]) or item["excerpt"][:300], "extractive"
 
-    def overview(self, articles: list) -> dict:
-        out = {}
-        for name, ask in self.llms.items():
-            lines = "\n".join(f"- [{a['blog']}] {a['title']}: {a['summaries'].get(name, a['summary'])}"
-                              for a in articles)
-            try:
-                out[name] = ask("아래는 이번 호 신문에 실린 블로그 글 요약입니다. 전체 흐름을 한국어 3~4문장 "
-                                "총평으로 써주세요. 총평 본문만 출력하세요.\n\n" + lines)
-            except Exception as e:  # noqa: BLE001
-                print(f"  {name} 총평 실패: {e}", file=sys.stderr)
-        return out
-
-
-def primary(d: dict) -> str:
-    for k in ("claude", "gemini", "extractive"):
-        if d.get(k):
-            return d[k]
-    return ""
+    def overview(self, articles: list) -> str:
+        """요약된 글이 2건 이상일 때만 Gemini로 총평 생성."""
+        summed = [a for a in articles if a.get("summary_by") == "gemini"]
+        if not self.gemini or len(summed) < 2:
+            return ""
+        lines = "\n".join(f"- [{a['blog']}] {a['title']}: {a['summary']}" for a in summed)
+        try:
+            return self.gemini.ask("아래는 이번 호 신문에 실린 블로그 글 요약입니다. 전체 흐름을 한국어 "
+                                   "3~4문장 총평으로 써주세요. 총평 본문만 출력하세요.\n\n" + lines)
+        except Exception as e:  # noqa: BLE001
+            print(f"  총평 실패: {e}", file=sys.stderr)
+            return ""
 
 
 def update_index():
@@ -329,30 +329,32 @@ def main():
         print("새 글 없음 → 호 생성 안 함")
         return
 
-    markers = {b["id"]: b.get("comment_marker") for b in blogs}
-    s = Summarizer()
+    conf = {b["id"]: b for b in blogs}
+    s = Summarizer() if any(b.get("summarize") for b in blogs) else None
     articles = []
     for it in items:
         body = fetch_body(it)
-        sums = s.article(it, body)
+        bc = conf[it["blog_id"]]
         art = {
             "blog": it["blog"], "title": it["title"], "url": it["url"],
             "published": it["published"], "length": len("".join(clean_lines(body))),
-            "summary": primary(sums), "summaries": sums,
         }
-        marker = markers.get(it["blog_id"])
+        if bc.get("summarize") and s:
+            art["summary"], art["summary_by"] = s.article(it, body)
+        else:
+            art["preview"] = preview(body) or it["excerpt"][:300]
+        marker = bc.get("comment_marker")
         if marker:
             art["comment"] = extract_comment(body, marker)
             if not art["comment"]:
                 print(f"  '{marker}' 없음: {it['title']}")
         articles.append(art)
 
-    ov = s.overview(articles)
     issue = {
         "id": issue_id, "date": date, "edition": edition,
         "window": {"from": start.isoformat(), "to": end.isoformat()},
         "generated": now.isoformat(),
-        "overview": primary(ov), "overviews": ov,
+        "overview": s.overview(articles) if s else "",
         "articles": articles,
     }
     out.write_text(json.dumps(issue, ensure_ascii=False, indent=1), encoding="utf-8")
