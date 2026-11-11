@@ -70,7 +70,19 @@ def fetch_body(item: dict) -> str:
         soup = BeautifulSoup(http_get(url), "html.parser")
         node = (soup.select_one(".se-main-container") or soup.select_one("#postViewArea")
                 or soup.select_one(".post-view"))
-        text = node.get_text("\n", strip=True) if node else ""
+        text = ""
+        if node:
+            # 글자색·굵기 등으로 나뉜 <span> 조각이 줄바꿈으로 끊기지 않도록 문단(<p>) 단위로 합친다.
+            for br in node.find_all("br"):
+                br.replace_with("\n")
+            for s in node.find_all(["strike", "s", "del"]):
+                t = s.get_text("")
+                s.replace_with(f"~~{t.strip()}~~" if t.strip() else t)  # 취소선 보존
+            for p in node.find_all("p"):
+                joined = p.get_text("")
+                p.clear()
+                p.append(joined)
+            text = node.get_text("\n", strip=True)
         if len(text) > 100:
             return text
     except Exception as e:  # noqa: BLE001
