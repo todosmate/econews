@@ -125,4 +125,15 @@ econews/
 - 2026-11-11: 비교용으로 **추출 요약(키 불필요) + Gemini 무료 등급(`GEMINI_API_KEY` Secret)** 을 동시에 생성해 `summaries`/`overviews`에 저장, 화면 상단 버튼으로 전환. Claude 키가 있으면 claude도 추가됨. 대표 요약 우선순위 claude > gemini > extractive.
 - 2026-11-11: 요약 분량을 본문 길이에 비례하게 변경 (본문의 약 15%, 250~1500자, 3~15문장 — `target_length()`).
 - Gemini 모델은 ListModels로 Flash → Flash-Lite 순 자동 선택(무료 일일 한도 소진 시 다음 모델). `GEMINI_MODEL` 환경변수로 고정 가능.
-- 다음 할 일: 사용자가 두 방식 결과를 보고 하나를 선택 → 선택 안 된 쪽 정리.
+- 2026-11-11: **최종 결정 — 요약은 Gemini.** 단, 요약은 blogs.json에 `"summarize": true` 인 블로그만 적용 (현재 ranto28만).
+  나머지 블로그(및 앞으로 추가되는 블로그 기본값)는 요약 없이 본문 앞 4~5줄(최대 400자)을 `preview`로 표시.
+  Gemini 실패 시에만 추출 요약으로 대체(`summary_by: "extractive"`, 화면에 "핵심 문장 발췌" 표시). 비교 탭·Claude 경로·anthropic 의존성 제거.
+  총평(overview)은 Gemini 요약 글이 2건 이상일 때만 생성.
+
+## 10. blogs.json 설정 방법 (현행)
+```json
+{ "id": "네이버ID", "name": "표시 이름", "summarize": true, "comment_marker": "한줄 코멘트" }
+```
+- `summarize` 생략 = 요약 안 함(미리보기 4~5줄). 사용자가 요약을 요청한 블로그만 `true`.
+- `comment_marker` 지정 시 본문에서 해당 문구로 시작하는 마지막 문단을 원문 그대로 `comment`로 표시.
+- 호 JSON의 글 필드: `summary`+`summary_by` (요약 블로그) 또는 `preview` (그 외), `comment`, `length`(본문 글자 수).
