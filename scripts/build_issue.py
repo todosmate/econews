@@ -97,80 +97,182 @@ def extract_comment(body: str, marker: str) -> str:
     return text
 
 
-class Summarizer:
-    """우선순위: ANTHROPIC_API_KEY(Claude) → GITHUB_TOKEN(GitHub Models) → 발췌문."""
+def clean_lines(body: str) -> list:
+    lines = [ln.replace("​", "").strip() for ln in body.split("\n")]
+    return [ln for ln in lines if ln]
 
-    GH_URL = "https://models.github.ai/inference/chat/completions"
 
-    def __init__(self):
-        self.provider = None
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            import anthropic
-            self.client = anthropic.Anthropic()
-            self.provider = "claude"
-        elif os.environ.get("GITHUB_TOKEN"):
-            self.provider = "github"
-            self.gh_models = [m.strip() for m in os.environ.get(
-                "ECONEWS_GH_MODELS", "openai/gpt-4.1-mini,openai/gpt-4o-mini").split(",") if m.strip()]
-        print(f"요약 방식: {self.provider or '발췌문(대체)'}")
+def target_length(body: str):
+    """본문 길이에 비례한 요약 분량: (문장 수, 글자 수). 본문의 약 15%, 3~15문장."""
+    n = len("".join(clean_lines(body)))
+    chars = max(250, min(1500, int(n * 0.15)))
+    sents = max(3, min(15, round(chars / 90)))
+    return sents, chars
 
-    def _ask_github(self, prompt: str, max_tokens: int) -> str:
+
+# ---------- 추출 요약 (키 불필요) ----------
+_STOP = set("그리고 그러나 하지만 그래서 그런데 또한 이런 저런 그런 이것 저것 그것 있는 있음 없는 없음 "
+            "하는 했다 한다 합니다 입니다 있습니다 것이 것은 것을 수가 수도 때문에 대한 대해 통해 위해 "
+            "정도 경우 지금 오늘 이번 그냥 아주 정말 많이 다시 이후 이전 같은 같음 이라는 라고".split())
+
+
+def _sentences(body: str) -> list:
+    out = []
+    for ln in clean_lines(body):
+        for s in re.split(r"(?<=[.!?。])\s+|(?<=[다음함임요])\.\s*", ln):
+            s = s.strip()
+            if len(s) >= 15 and not s.startswith(("http", "출처", "PS)")):
+                out.append(s)
+    return out
+
+
+def extractive_summary(body: str, title: str) -> str:
+    sents = _sentences(body)
+    if not sents:
+        return ""
+    k, _ = target_length(body)
+    tok = lambda s: [w for w in re.findall(r"[가-힣A-Za-z0-9]{2,}", s) if w not in _STOP]
+    freq = {}
+    for s in sents:
+        for w in set(tok(s)):
+            freq[w] = freq.get(w, 0) + 1
+    title_words = set(tok(title))
+    n = len(sents)
+    scored = []
+    for i, s in enumerate(sents):
+        ws = tok(s)
+        if not ws:
+            continue
+        score = sum(freq.get(w, 0) for w in ws) / (len(ws) ** 0.5)
+        score += 2 * len(title_words & set(ws))
+        if i < 3:
+            score *= 1.2  # 도입부 가중
+        scored.append((score, i))
+    top = sorted(i for _, i in sorted(scored, reverse=True)[:k])
+    return " ".join(sents[i] for i in top)
+
+
+# ---------- Gemini (무료 등급) ----------
+class Gemini:
+    BASE = "https://generativelanguage.googleapis.com/v1beta"
+
+    def __init__(self, key: str):
+        self.key = key
+        env = os.environ.get("GEMINI_MODEL")
+        self.models = [env] if env else self._pick_models()
+        print(f"Gemini 모델 후보: {self.models}")
+
+    def _req(self, path, payload=None):
+        req = urllib.request.Request(
+            f"{self.BASE}/{path}", data=json.dumps(payload).encode() if payload else None,
+            method="POST" if payload else "GET",
+            headers={"x-goog-api-key": self.key, "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return json.loads(r.read().decode())
+
+    def _pick_models(self):
+        try:
+            ms = self._req("models?pageSize=1000").get("models", [])
+        except Exception as e:  # noqa: BLE001
+            print(f"  Gemini 모델 목록 실패: {e}", file=sys.stderr)
+            return ["gemini-flash-latest", "gemini-flash-lite-latest"]
+        bad = ("image", "tts", "audio", "live", "embedding", "vision", "robotics", "computer")
+        names = [m["name"].split("/", 1)[1] for m in ms
+                 if "generateContent" in m.get("supportedGenerationMethods", [])
+                 and "flash" in m["name"] and not any(b in m["name"] for b in bad)]
+        ver = lambda n: tuple(float(x) for x in re.findall(r"\d+(?:\.\d+)?", n)[:1] or [0])
+        full = sorted([n for n in names if "lite" not in n], key=ver, reverse=True)
+        lite = sorted([n for n in names if "lite" in n], key=ver, reverse=True)
+        # 정식(비-preview) 우선, Flash → Flash-Lite 순으로 시도 (한도 초과 시 다음 모델)
+        pref = lambda lst: [n for n in lst if "preview" not in n and "exp" not in n] + \
+                           [n for n in lst if "preview" in n or "exp" in n]
+        return (pref(full)[:2] + pref(lite)[:2]) or ["gemini-flash-latest"]
+
+    def ask(self, prompt: str) -> str:
         last = None
-        for model in self.gh_models:
-            body = json.dumps({"model": model, "max_tokens": max_tokens, "temperature": 0.3,
-                               "messages": [{"role": "user", "content": prompt}]}).encode()
-            req = urllib.request.Request(self.GH_URL, data=body, method="POST", headers={
-                "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
-                "Content-Type": "application/json", "Accept": "application/json"})
-            for attempt in range(3):
+        for m in list(self.models):
+            for attempt in range(2):
                 try:
-                    with urllib.request.urlopen(req, timeout=90) as r:
-                        j = json.loads(r.read().decode())
-                    time.sleep(3)  # 분당 요청 한도 여유
-                    return j["choices"][0]["message"]["content"].strip()
+                    j = self._req(f"models/{m}:generateContent", {
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 8192}})
+                    parts = j["candidates"][0]["content"]["parts"]
+                    text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+                    if text:
+                        time.sleep(5)  # 분당 한도 여유
+                        return text
+                    last = f"{m}: 빈 응답 {str(j)[:200]}"
+                    break
                 except urllib.error.HTTPError as e:
-                    last = f"{model} HTTP {e.code}: {e.read()[:300]!r}"
-                    if e.code == 429:
-                        time.sleep(30 * (attempt + 1))
+                    last = f"{m} HTTP {e.code}: {e.read()[:300]!r}"
+                    if e.code == 429 and attempt == 0:
+                        time.sleep(30)
                         continue
-                    break  # 다른 오류 → 다음 모델
+                    if e.code in (404, 429, 403):  # 없는 모델/한도 소진 → 이후엔 다음 모델 사용
+                        self.models.remove(m)
+                    break
                 except Exception as e:  # noqa: BLE001
-                    last = f"{model}: {e}"
+                    last = f"{m}: {e}"
                     break
         raise RuntimeError(last)
 
-    def _ask(self, prompt: str, max_tokens: int) -> str:
-        if self.provider == "github":
-            return self._ask_github(prompt, max_tokens)
-        msg = self.client.messages.create(
-            model=MODEL, max_tokens=max_tokens,
-            messages=[{"role": "user", "content": prompt}])
-        return "".join(b.text for b in msg.content if b.type == "text").strip()
 
-    def article(self, item: dict, body: str) -> str:
-        body = body[:MAX_BODY]
-        if not self.provider:
-            return item["excerpt"][:200]
-        try:
-            return self._ask(
-                "다음 블로그 글을 한국어로 3~5문장으로 요약하세요. 핵심 주장과 근거 위주로, "
-                "군더더기·인사말 없이 요약문만 출력하세요.\n\n"
-                f"제목: {item['title']}\n본문:\n{body}", 600)
-        except Exception as e:  # noqa: BLE001
-            print(f"  요약 실패({item['url']}): {e}", file=sys.stderr)
-            return item["excerpt"][:200]
+class Summarizer:
+    """요약 방식: extractive(항상) + gemini(GEMINI_API_KEY 있으면) + claude(ANTHROPIC_API_KEY 있으면).
+    여러 방식을 모두 저장해 화면에서 비교한다. 대표 요약(summary)은 claude > gemini > extractive."""
 
-    def overview(self, articles: list) -> str:
-        if not self.provider:
-            return ""
-        lines = "\n".join(f"- [{a['blog']}] {a['title']}: {a['summary']}" for a in articles)
-        try:
-            return self._ask(
-                "아래는 이번 호 신문에 실린 블로그 글 요약입니다. 전체 흐름을 한국어 2~3문장 총평으로 "
-                "써주세요. 총평 본문만 출력하세요.\n\n" + lines, 400)
-        except Exception as e:  # noqa: BLE001
-            print(f"  총평 실패: {e}", file=sys.stderr)
-            return ""
+    def __init__(self):
+        self.llms = {}
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            import anthropic
+            client = anthropic.Anthropic()
+            self.llms["claude"] = lambda p: "".join(
+                b.text for b in client.messages.create(
+                    model=MODEL, max_tokens=4096, messages=[{"role": "user", "content": p}]).content
+                if b.type == "text").strip()
+        if os.environ.get("GEMINI_API_KEY"):
+            self.llms["gemini"] = Gemini(os.environ["GEMINI_API_KEY"]).ask
+        print(f"요약 방식: extractive + {list(self.llms) or '없음'}")
+
+    @staticmethod
+    def _prompt(item, body):
+        k, chars = target_length(body)
+        return (
+            f"다음 블로그 글을 한국어로 요약하세요.\n"
+            f"- 분량: 약 {k}문장, {chars}자 내외 (본문 길이에 맞춘 분량이니 지켜주세요)\n"
+            f"- 글쓴이의 핵심 주장, 근거가 되는 수치·사실, 결론을 빠짐없이 담으세요.\n"
+            f"- 내용이 바뀌는 부분은 줄바꿈으로 문단을 나누세요.\n"
+            f"- 인사말·머리말 없이 요약문만 출력하세요. 마크다운 기호(#, *, -)는 쓰지 마세요.\n\n"
+            f"제목: {item['title']}\n본문:\n{body[:MAX_BODY * 2]}")
+
+    def article(self, item: dict, body: str) -> dict:
+        out = {"extractive": extractive_summary(body, item["title"]) or item["excerpt"][:300]}
+        prompt = self._prompt(item, body)
+        for name, ask in self.llms.items():
+            try:
+                out[name] = ask(prompt)
+            except Exception as e:  # noqa: BLE001
+                print(f"  {name} 요약 실패({item['url']}): {e}", file=sys.stderr)
+        return out
+
+    def overview(self, articles: list) -> dict:
+        out = {}
+        for name, ask in self.llms.items():
+            lines = "\n".join(f"- [{a['blog']}] {a['title']}: {a['summaries'].get(name, a['summary'])}"
+                              for a in articles)
+            try:
+                out[name] = ask("아래는 이번 호 신문에 실린 블로그 글 요약입니다. 전체 흐름을 한국어 3~4문장 "
+                                "총평으로 써주세요. 총평 본문만 출력하세요.\n\n" + lines)
+            except Exception as e:  # noqa: BLE001
+                print(f"  {name} 총평 실패: {e}", file=sys.stderr)
+        return out
+
+
+def primary(d: dict) -> str:
+    for k in ("claude", "gemini", "extractive"):
+        if d.get(k):
+            return d[k]
+    return ""
 
 
 def update_index():
@@ -225,9 +327,11 @@ def main():
     articles = []
     for it in items:
         body = fetch_body(it)
+        sums = s.article(it, body)
         art = {
             "blog": it["blog"], "title": it["title"], "url": it["url"],
-            "published": it["published"], "summary": s.article(it, body),
+            "published": it["published"], "length": len("".join(clean_lines(body))),
+            "summary": primary(sums), "summaries": sums,
         }
         marker = markers.get(it["blog_id"])
         if marker:
@@ -236,11 +340,12 @@ def main():
                 print(f"  '{marker}' 없음: {it['title']}")
         articles.append(art)
 
+    ov = s.overview(articles)
     issue = {
         "id": issue_id, "date": date, "edition": edition,
         "window": {"from": start.isoformat(), "to": end.isoformat()},
         "generated": now.isoformat(),
-        "overview": s.overview(articles),
+        "overview": primary(ov), "overviews": ov,
         "articles": articles,
     }
     out.write_text(json.dumps(issue, ensure_ascii=False, indent=1), encoding="utf-8")

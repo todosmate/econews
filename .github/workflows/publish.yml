@@ -21,7 +21,6 @@ on:
 
 permissions:
   contents: write
-  models: read
 
 concurrency:
   group: publish-issue
@@ -40,7 +39,7 @@ jobs:
       - name: Build issue
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           IN_DATE: ${{ github.event.inputs.date }}
           IN_EDITION: ${{ github.event.inputs.edition }}
           IN_FORCE: ${{ github.event.inputs.force }}

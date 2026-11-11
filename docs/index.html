@@ -29,6 +29,11 @@
   .card p { margin:0 0 6px; white-space:pre-wrap; }
   .card .comment { margin:8px 0; padding:8px 12px; background:var(--bg); border-left:3px solid var(--accent); font-size:.95rem; }
   .card .comment b { color:var(--accent); margin-right:6px; }
+  .card .len { color:var(--muted); font-weight:400; margin-left:6px; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+  .tabs button { font:inherit; font-size:.85rem; padding:5px 12px; border:1px solid var(--line); border-radius:999px;
+                 background:var(--card); color:var(--fg); cursor:pointer; }
+  .tabs button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
   .card .time { font-size:.78rem; color:var(--muted); }
   aside h4 { margin:0 0 8px; font-size:.95rem; border-bottom:1px solid var(--line); padding-bottom:4px; }
   aside ul { list-style:none; margin:0; padding:0; font-size:.9rem; }
@@ -73,18 +78,34 @@ async function main() {
     `<li><a href="?issue=${esc(e.id)}" class="${e.id === cur.id ? "on" : ""}">${esc(e.date)} ${ED[e.edition]} (${e.count})</a></li>`).join("");
 
   const j = await getJSON(`data/issues/${cur.id}.json`);
+  const methods = ["gemini", "claude", "extractive"].filter(m => j.articles.some(a => a.summaries?.[m]));
+  let saved = null; try { saved = localStorage.getItem("econews-method"); } catch (e) {}
+  render(j, methods, methods.includes(saved) ? saved : methods[0]);
+}
+
+const ML = { gemini: "Gemini 요약", claude: "Claude 요약", extractive: "추출 요약(핵심 문장)" };
+
+function render(j, methods, m) {
+  const sum = (a) => (m && a.summaries?.[m]) || a.summary;
+  const ov = (m && j.overviews?.[m]) || (m === "extractive" ? "" : j.overview);
   $("#main").innerHTML = `
     <h2>${esc(j.date)} ${ED[j.edition]}</h2>
     <div class="meta">${hm(j.window.from)} ~ ${hm(j.window.to)} 등록 글 · 총 ${j.articles.length}건</div>
-    ${j.overview ? `<div class="overview">${esc(j.overview)}</div>` : ""}
+    ${methods.length > 1 ? `<div class="tabs">${methods.map(x =>
+      `<button data-m="${x}" class="${x === m ? "on" : ""}">${ML[x]}</button>`).join("")}</div>` : ""}
+    ${ov ? `<div class="overview">${esc(ov)}</div>` : ""}
     ${j.articles.map(a => `
       <article class="card">
-        <div class="blog">${esc(a.blog)}</div>
+        <div class="blog">${esc(a.blog)}${a.length ? ` <span class="len">본문 ${a.length.toLocaleString()}자</span>` : ""}</div>
         <h3><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a></h3>
-        <p>${esc(a.summary)}</p>
+        <p>${esc(sum(a))}</p>
         ${a.comment ? `<div class="comment"><b>한줄 코멘트</b> ${esc(a.comment)}</div>` : ""}
         <div class="time">${hm(a.published)} · <a href="${esc(a.url)}" target="_blank" rel="noopener">원문 보기</a></div>
       </article>`).join("")}`;
+  document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+    try { localStorage.setItem("econews-method", b.dataset.m); } catch (e) {}
+    render(j, methods, b.dataset.m);
+  });
 }
 main().catch(e => { $("#main").innerHTML = `<div class="empty">오류: ${esc(e.message)}</div>`; });
 </script>
