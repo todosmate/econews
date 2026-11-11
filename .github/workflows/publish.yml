@@ -48,7 +48,7 @@ jobs:
           [ -n "$IN_DATE" ] && args="$args --date $IN_DATE"
           [ -n "$IN_EDITION" ] && args="$args --edition $IN_EDITION"
           [ "$IN_FORCE" = "true" ] && args="$args --force"
-          python scripts/build_issue.py $args
+          python -u scripts/build_issue.py $args
       - name: Commit
         run: |
           git config user.name "econews-bot"

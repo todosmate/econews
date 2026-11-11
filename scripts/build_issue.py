@@ -105,8 +105,9 @@ def clean_lines(body: str) -> list:
 def target_length(body: str):
     """본문 길이에 비례한 요약 분량: (문장 수, 글자 수). 본문의 약 15%, 3~15문장."""
     n = len("".join(clean_lines(body)))
-    chars = max(250, min(1500, int(n * 0.15)))
-    sents = max(3, min(15, round(chars / 90)))
+    floor = min(250, int(n * 0.5))  # 짧은 글은 본문 절반을 넘지 않게
+    chars = max(floor, min(1500, int(n * 0.15)))
+    sents = max(1 if n < 400 else 3, min(15, round(chars / 90)))
     return sents, chars
 
 
@@ -192,6 +193,7 @@ class Gemini:
         last = None
         for m in list(self.models):
             for attempt in range(2):
+                t0 = time.time()
                 try:
                     j = self._req(f"models/{m}:generateContent", {
                         "contents": [{"parts": [{"text": prompt}]}],
@@ -199,12 +201,14 @@ class Gemini:
                     parts = j["candidates"][0]["content"]["parts"]
                     text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
                     if text:
+                        print(f"    gemini {m}: {time.time() - t0:.0f}초, {len(text)}자")
                         time.sleep(5)  # 분당 한도 여유
                         return text
                     last = f"{m}: 빈 응답 {str(j)[:200]}"
                     break
                 except urllib.error.HTTPError as e:
                     last = f"{m} HTTP {e.code}: {e.read()[:300]!r}"
+                    print(f"    gemini {last[:200]} ({time.time() - t0:.0f}초)")
                     if e.code == 429 and attempt == 0:
                         time.sleep(30)
                         continue
@@ -213,6 +217,7 @@ class Gemini:
                     break
                 except Exception as e:  # noqa: BLE001
                     last = f"{m}: {e}"
+                    print(f"    gemini {last[:200]} ({time.time() - t0:.0f}초)")
                     break
         raise RuntimeError(last)
 
