@@ -1,0 +1,121 @@
+# econews 프로젝트 계획서 (PROJECT.md)
+
+> 이 문서는 작업 기준 문서입니다. 새 세션에서는 이 파일을 먼저 읽고 "진행 현황" 체크리스트에서 이어서 작업합니다.
+> 작업을 마칠 때마다 체크리스트와 "결정 사항"을 갱신합니다.
+
+## 1. 목표
+네이버 블로그 여러 개의 새 글을 모아 **요약·정리한 "신문" 페이지**를 하루 2회 자동 발행한다.
+
+- **조간**: 매일 08:00 KST 발행. 전날 18:00 ~ 당일 08:00 사이 등록된 글
+- **석간**: 매일 18:00 KST 발행. 당일 08:00 ~ 18:00 사이 등록된 글
+
+## 2. 확정된 조건
+| 항목 | 내용 |
+|---|---|
+| 블로그 | 네이버 블로그 2개 (추후 증가 가능) |
+| 글 수 | 하루 총 6~7개 수준 |
+| 호스팅 | GitHub (저장소 + GitHub Pages) |
+| 수집 | 네이버 블로그 RSS (`https://rss.blog.naver.com/<블로그ID>.xml`) |
+| 요약 | Claude API (API 키는 GitHub Secrets에 보관) |
+| 서버/DB | 없음. 결과는 JSON 파일로 저장소에 커밋 |
+
+## 3. 미확정 사항 (사용자에게 확인 필요)
+- [ ] 블로그 2개의 네이버 블로그 ID(주소)
+- [ ] 공개 사이트 여부 (무료 Pages는 공개 저장소만 가능. 비공개 원하면 대안 필요)
+- [ ] GitHub 저장소 이름 / 계정명
+- [ ] 요약 언어·분량 (기본안: 글당 3~5줄 한국어 + 호 전체 총평 3줄)
+
+## 4. 아키텍처
+```
+GitHub Actions (cron: 08:00 / 18:00 KST)
+   ↓
+scripts/fetch.py   : blogs.json의 RSS 수집 → 해당 구간(window) 글만 필터
+scripts/summarize.py: Claude API로 글별 요약 + 호 총평
+   ↓
+data/issues/YYYY-MM-DD-am.json, YYYY-MM-DD-pm.json 저장 + data/index.json 갱신 → 커밋
+   ↓
+GitHub Pages: docs/ (정적 HTML/JS)가 data/*.json을 읽어 신문 형태로 표시
+```
+
+### 시간대 처리
+- Actions cron은 UTC 기준: 조간 `0 23 * * *`(=08:00 KST), 석간 `0 9 * * *`(=18:00 KST)
+- 스케줄은 수 분~수십 분 지연될 수 있으므로 **실행 시각이 아니라 고정 구간(전날18:00~08:00 / 08:00~18:00 KST)을 계산해 필터링**한다.
+- 중복 방지: 이미 발행된 호 파일이 있으면 건너뛴다. 글 URL(logNo) 기준으로 중복 제거.
+- 수동 실행(`workflow_dispatch`)으로 특정 날짜·조/석간 재생성 가능하게 한다.
+
+## 5. 저장소 구조 (예정)
+```
+econews/
+├─ PROJECT.md              # 이 문서
+├─ blogs.json              # 블로그 목록 (id, 이름) — 블로그 추가는 여기만 수정
+├─ scripts/
+│  ├─ fetch.py
+│  ├─ summarize.py
+│  └─ build_issue.py       # 위 둘을 묶어 호 JSON 생성
+├─ data/
+│  ├─ index.json           # 발행된 호 목록
+│  └─ issues/*.json
+├─ docs/                   # GitHub Pages 루트
+│  ├─ index.html           # 최신 호
+│  ├─ archive.html         # 지난 호 목록
+│  └─ assets/ (css, js)
+└─ .github/workflows/
+   └─ publish.yml
+```
+
+### blogs.json 예시
+```json
+[
+  { "id": "네이버블로그ID1", "name": "블로그 이름 1" },
+  { "id": "네이버블로그ID2", "name": "블로그 이름 2" }
+]
+```
+
+### 호(issue) JSON 예시
+```json
+{
+  "date": "2026-11-11",
+  "edition": "am",
+  "window": { "from": "2026-11-10T18:00:00+09:00", "to": "2026-11-11T08:00:00+09:00" },
+  "overview": "이번 호 총평...",
+  "articles": [
+    { "blog": "블로그 이름 1", "title": "...", "url": "...", "published": "...", "summary": "..." }
+  ]
+}
+```
+
+## 6. 화면 구성
+- **메인**: 최신 호 — 제목(날짜·조간/석간), 총평, 블로그별 요약 카드, 원문 링크
+- **아카이브**: 지난 호 목록
+- (선택) 블로그별 필터, 키워드 검색
+
+## 7. 주의 사항
+- 네이버 RSS는 본문이 일부만 포함될 수 있음. 부족하면 글 URL 본문 가져오기(모바일 `m.blog.naver.com`)를 보조로 사용 — 필요할 때 결정.
+- 타인 블로그 요약을 공개할 경우 원문 전문 게재 금지. 짧은 요약 + 원문 링크만.
+- API 키 등 비밀값은 코드/저장소에 넣지 말고 GitHub Secrets(`ANTHROPIC_API_KEY`) 사용.
+- 새 글이 없는 호는 "새 글 없음"으로 발행하거나 건너뛴다 (기본안: 건너뜀, 추후 결정).
+- 요약 모델은 비용 대비 가벼운 모델(Haiku급)로 시작, 품질 부족 시 상향.
+
+## 8. 진행 현황
+- [x] 방향 결정: GitHub Actions + Pages + Claude API
+- [x] 계획 문서 작성 (PROJECT.md)
+- [x] 블로그 확정: `ranto28`(메르의 블로그), `red_annie`(그냥 아지매) → blogs.json
+- [x] 코드 작성: scripts/build_issue.py (수집+필터+본문+요약+저장 통합), docs/index.html, .github/workflows/publish.yml
+- [ ] **이 PC에 git / python 미설치** → git(+gh) 설치 필요 (python은 Actions에서 실행되므로 로컬엔 선택)
+- [ ] GitHub 저장소 `econews` 생성 (공개) 후 첫 push
+- [ ] Settings → Pages → Source: Deploy from branch / `main` / `/docs`
+- [ ] Settings → Secrets → `ANTHROPIC_API_KEY` 등록
+- [ ] Actions 탭에서 publish-issue 수동 실행(workflow_dispatch)으로 end-to-end 검증
+- [ ] 스케줄 동작 확인 (조간/석간 각 1회)
+- [ ] (추후) 블로그 추가는 blogs.json에 한 줄 추가
+
+## 8-1. 구현 메모
+- 데이터 위치는 Pages 루트가 docs/ 이므로 `docs/data/` (issues/*.json, index.json). 5절의 data/ 는 이 경로로 대체됨.
+- 본문은 `blog.naver.com/PostView.naver?blogId=..&logNo=..` 에서 `.se-main-container` 를 파싱 (RSS description은 발췌문 ~400자뿐). 실패 시 발췌문으로 대체. 로컬(PowerShell)로 접근 가능함을 확인함.
+- 요약 모델 기본값 `claude-haiku-5-5` (환경변수 `ECONEWS_MODEL`로 변경). 키가 없으면 발췌문으로 대체.
+- 호 자동 판별: 실행 시각(KST) 13시 이전 = 조간, 이후 = 석간. 새 글이 없으면 호를 만들지 않음.
+- 로컬 실행: `pip install -r requirements.txt` 후 `python scripts/build_issue.py --date YYYY-MM-DD --edition am --force`
+- 코드는 아직 한 번도 실행해보지 못함 (로컬에 python 없음) → 첫 Actions 실행 로그로 검증 필요.
+
+## 9. 결정 기록
+- 2026-11-11: DB 없이 JSON 파일 + 정적 사이트 방식 채택. 글이 하루 6~7개로 소량이라 충분.

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>econews 블로그 신문</title>
+<style>
+  :root { --bg:#faf8f3; --fg:#1d1d1b; --muted:#6b6b66; --line:#d9d4c7; --card:#fff; --accent:#8a1c1c; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#17171a; --fg:#ececea; --muted:#9a9a94; --line:#2f2f35; --card:#1f1f24; --accent:#e0786f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); line-height:1.65;
+         font-family:"Noto Serif KR","Apple SD Gothic Neo","Malgun Gothic",serif; }
+  .wrap { max-width:900px; margin:0 auto; padding:0 16px 48px; }
+  header { text-align:center; padding:28px 0 14px; border-bottom:3px double var(--fg); }
+  header h1 { margin:0; font-size:2rem; letter-spacing:.08em; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:.9rem; }
+  .layout { display:grid; grid-template-columns:1fr 200px; gap:28px; margin-top:20px; }
+  @media (max-width:720px) { .layout { grid-template-columns:1fr; } }
+  h2 { margin:0 0 4px; font-size:1.4rem; }
+  .meta { color:var(--muted); font-size:.85rem; margin-bottom:14px; }
+  .overview { border-left:4px solid var(--accent); background:var(--card); padding:10px 14px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:14px 16px; margin-bottom:14px; }
+  .card .blog { font-size:.78rem; color:var(--accent); font-weight:700; }
+  .card h3 { margin:2px 0 6px; font-size:1.08rem; }
+  .card h3 a { color:inherit; text-decoration:none; }
+  .card h3 a:hover { text-decoration:underline; }
+  .card p { margin:0 0 6px; white-space:pre-wrap; }
+  .card .time { font-size:.78rem; color:var(--muted); }
+  aside h4 { margin:0 0 8px; font-size:.95rem; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  aside ul { list-style:none; margin:0; padding:0; font-size:.9rem; }
+  aside li { margin-bottom:4px; }
+  aside a { color:inherit; text-decoration:none; }
+  aside a:hover, aside a.on { color:var(--accent); font-weight:700; }
+  .empty { color:var(--muted); text-align:center; padding:60px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>econews</h1>
+    <p>블로그 조간 · 석간 요약 신문</p>
+  </header>
+  <div class="layout">
+    <main id="main"><div class="empty">불러오는 중…</div></main>
+    <aside><h4>지난 호</h4><ul id="archive"></ul></aside>
+  </div>
+</div>
+<script>
+const ED = { am: "조간", pm: "석간" };
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const hm = (iso) => new Date(iso).toLocaleString("ko-KR", { timeZone:"Asia/Seoul", month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit", hour12:false });
+
+async function getJSON(path) {
+  const r = await fetch(path, { cache: "no-cache" });
+  if (!r.ok) throw new Error(path + " " + r.status);
+  return r.json();
+}
+
+async function main() {
+  let index = [];
+  try { index = await getJSON("data/index.json"); } catch (e) {}
+  if (!index.length) { $("#main").innerHTML = '<div class="empty">아직 발행된 호가 없습니다.</div>'; return; }
+
+  const wanted = new URLSearchParams(location.search).get("issue");
+  const cur = index.find(e => e.id === wanted) || index[0];
+
+  $("#archive").innerHTML = index.map(e =>
+    `<li><a href="?issue=${esc(e.id)}" class="${e.id === cur.id ? "on" : ""}">${esc(e.date)} ${ED[e.edition]} (${e.count})</a></li>`).join("");
+
+  const j = await getJSON(`data/issues/${cur.id}.json`);
+  $("#main").innerHTML = `
+    <h2>${esc(j.date)} ${ED[j.edition]}</h2>
+    <div class="meta">${hm(j.window.from)} ~ ${hm(j.window.to)} 등록 글 · 총 ${j.articles.length}건</div>
+    ${j.overview ? `<div class="overview">${esc(j.overview)}</div>` : ""}
+    ${j.articles.map(a => `
+      <article class="card">
+        <div class="blog">${esc(a.blog)}</div>
+        <h3><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a></h3>
+        <p>${esc(a.summary)}</p>
+        <div class="time">${hm(a.published)} · <a href="${esc(a.url)}" target="_blank" rel="noopener">원문 보기</a></div>
+      </article>`).join("")}`;
+}
+main().catch(e => { $("#main").innerHTML = `<div class="empty">오류: ${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

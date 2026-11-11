@@ -1,0 +1,59 @@
+name: publish-issue
+
+on:
+  schedule:
+    - cron: "0 23 * * *"   # 08:00 KST 조간
+    - cron: "0 9 * * *"    # 18:00 KST 석간
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "발행일 YYYY-MM-DD (비우면 오늘)"
+        required: false
+      edition:
+        description: "am(조간) / pm(석간) (비우면 자동)"
+        required: false
+        type: choice
+        options: ["", am, pm]
+      force:
+        description: "이미 있는 호도 다시 생성"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-issue
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Build issue
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IN_DATE: ${{ github.event.inputs.date }}
+          IN_EDITION: ${{ github.event.inputs.edition }}
+          IN_FORCE: ${{ github.event.inputs.force }}
+        run: |
+          args=""
+          [ -n "$IN_DATE" ] && args="$args --date $IN_DATE"
+          [ -n "$IN_EDITION" ] && args="$args --edition $IN_EDITION"
+          [ "$IN_FORCE" = "true" ] && args="$args --force"
+          python scripts/build_issue.py $args
+      - name: Commit
+        run: |
+          git config user.name "econews-bot"
+          git config user.email "econews-bot@users.noreply.github.com"
+          git add docs/data
+          git diff --cached --quiet && echo "변경 없음" && exit 0
+          git commit -m "issue: $(date -u +%Y-%m-%dT%H:%MZ)"
+          git pull --rebase
+          git push
