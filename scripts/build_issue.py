@@ -120,6 +120,8 @@ _STOP = set("그리고 그러나 하지만 그래서 그런데 또한 이런 저
 def _sentences(body: str) -> list:
     out = []
     for ln in clean_lines(body):
+        if "©" in ln or "출처 OGQ" in ln or re.search(r"네이버\s?블로그$", ln):
+            continue  # 사진 저작권 표기·링크 카드 제거
         for s in re.split(r"(?<=[.!?。])\s+|(?<=[다음함임요])\.\s*", ln):
             s = s.strip()
             if len(s) >= 15 and not s.startswith(("http", "출처", "PS)")):
