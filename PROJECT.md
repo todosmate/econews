@@ -141,6 +141,10 @@ econews/
   발행 알림은 ntfy.sh 사용: Secret `NTFY_TOPIC`(값은 공개 저장소에 기록하지 않음, 사용자에게만 전달). build_issue.py가 notify.json 생성 →
   워크플로가 Pages 반영 90초 대기 후 전송. 알림 클릭 시 해당 호로 이동. 전송 동작 확인 완료.
 
+- 2026-11-12: 화면 디자인을 **종이 신문 스타일**로 변경 (docs/index.html만 교체, 데이터 형식·스크립트 변경 없음).
+  큰 제호(ECONEWS) + 날짜/조간·석간 띠 + 예고 띠(그 호의 다른 글 2~3건) + 지난 호 INDEX 박스. 흑백(종이색/먹색), 다크 모드 지원.
+  글 목록은 기존처럼 세로 리스트 유지, 본문은 화면 크기와 무관하게 **항상 1단** (사용자 요청). 글꼴은 Google Fonts(Abril Fatface, Black Han Sans, Noto Serif KR).
+
 ## 10. blogs.json 설정 방법 (현행)
 ```json
 { "id": "네이버ID", "name": "표시 이름", "summarize": true, "comment_marker": "한줄 코멘트" }

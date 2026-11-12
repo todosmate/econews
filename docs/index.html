@@ -7,71 +7,150 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<meta name="theme-color" content="#8a1c1c">
+<meta name="theme-color" content="#111111">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="econews">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Black+Han+Sans&family=Noto+Serif+KR:wght@400;700&display=swap">
 <style>
-  :root { --bg:#faf8f3; --fg:#1d1d1b; --muted:#6b6b66; --line:#d9d4c7; --card:#fff; --accent:#8a1c1c; }
+  :root { --paper:#f3f0e8; --ink:#111111; --muted:#5d5a52; --hair:rgba(17,17,17,.22); }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#17171a; --fg:#ececea; --muted:#9a9a94; --line:#2f2f35; --card:#1f1f24; --accent:#e0786f; }
+    :root { --paper:#141413; --ink:#ecebe6; --muted:#9c9a92; --hair:rgba(236,235,230,.25); }
   }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); line-height:1.65;
-         font-family:"Noto Serif KR","Apple SD Gothic Neo","Malgun Gothic",serif; }
-  .wrap { max-width:900px; margin:0 auto; padding:0 16px 48px; }
-  header { text-align:center; padding:calc(28px + env(safe-area-inset-top)) 0 14px; border-bottom:3px double var(--fg); }
-  header h1 { margin:0; font-size:2rem; letter-spacing:.08em; }
-  header p { margin:4px 0 0; color:var(--muted); font-size:.9rem; }
-  .layout { display:grid; grid-template-columns:1fr 200px; gap:28px; margin-top:20px; }
-  @media (max-width:720px) { .layout { grid-template-columns:1fr; } }
-  h2 { margin:0 0 4px; font-size:1.4rem; }
-  .meta { color:var(--muted); font-size:.85rem; margin-bottom:14px; }
-  .overview { border-left:4px solid var(--accent); background:var(--card); padding:10px 14px; margin-bottom:20px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:14px 16px; margin-bottom:14px; }
-  .card .blog { font-size:1.08rem; color:var(--accent); font-weight:700; }
-  .card h3 { margin:2px 0 6px; font-size:1.08rem; }
-  .card h3 a { color:inherit; text-decoration:none; }
-  .card h3 a:hover { text-decoration:underline; }
-  .card p { margin:0 0 6px; white-space:pre-wrap; }
-  .card .comment { margin:8px 0; padding:8px 12px; background:var(--bg); border-left:3px solid var(--accent); font-size:.95rem; white-space:pre-wrap; }
-  .card .comment b { color:var(--accent); margin-right:6px; }
-  .card .len { color:var(--muted); font-weight:400; margin-left:6px; font-size:.78rem; }
-  .card .preview { color:var(--fg); opacity:.85; }
-  .card .tag { display:inline-block; font-size:.72rem; color:var(--muted); border:1px solid var(--line);
-               border-radius:999px; padding:0 8px; margin-bottom:6px; }
-  .card .time { font-size:.78rem; color:var(--muted); }
-  aside h4 { margin:0 0 8px; font-size:.95rem; border-bottom:1px solid var(--line); padding-bottom:4px; }
-  aside ul { list-style:none; margin:0; padding:0; font-size:.9rem; }
-  aside li { margin-bottom:4px; }
-  aside a { color:inherit; text-decoration:none; }
-  aside a:hover, aside a.on { color:var(--accent); font-weight:700; }
+  html { scroll-behavior: smooth; }
+  body { margin:0; background:var(--paper); color:var(--ink); line-height:1.72;
+         font-family:"Noto Serif KR","Batang","Apple SD Gothic Neo","Malgun Gothic",serif; }
+  a { color:inherit; }
+  .sans { font-family:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif; }
+  .wrap { max-width:1040px; margin:0 auto; padding:0 18px 56px; }
+
+  /* ── 제호(마스트헤드) ── */
+  .topline { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;
+             padding:calc(14px + env(safe-area-inset-top)) 0 6px; border-bottom:1px solid var(--ink);
+             font-size:.66rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
+  .masthead { overflow:hidden; text-align:center; }
+  .masthead h1 { display:inline-block; margin:.04em 0 0; white-space:nowrap; font-weight:400;
+                 font-family:"Abril Fatface","Bodoni MT Black","Didot","Georgia",serif;
+                 font-size:17vw; line-height:.92; letter-spacing:.015em; text-transform:uppercase; }
+  .edition { display:grid; grid-template-columns:1fr auto 1fr; align-items:end; gap:10px;
+             padding:2px 0 8px; border-bottom:5px solid var(--ink);
+             font-size:.72rem; font-weight:700; letter-spacing:.06em; }
+  .edition .ed { font-size:clamp(1.1rem,3.4vw,1.7rem); font-weight:900; letter-spacing:.9em; margin-right:-.9em; line-height:1; }
+  .edition .r { text-align:right; }
+
+  /* ── 제호 아래 예고 띠 ── */
+  .teasers { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); border-bottom:1px solid var(--ink); }
+  .teasers a { display:block; text-decoration:none; padding:10px 12px 11px; border-left:1px solid var(--hair); }
+  .teasers a:first-child { border-left:0; padding-left:0; }
+  .teasers b { display:block; font-size:.66rem; letter-spacing:.1em; }
+  .teasers span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+                  font-size:.84rem; line-height:1.4; font-style:italic; }
+  .teasers a:hover span { text-decoration:underline; }
+
+  .layout { display:grid; grid-template-columns:minmax(0,1fr) 220px; gap:30px; margin-top:18px; }
+  @media (max-width:760px) { .layout { grid-template-columns:1fr; } .index { position:static; } }
+  @media (max-width:520px) { .teasers { grid-template-columns:1fr 1fr; } .teasers a:nth-child(n+3) { display:none; } }
+  .meta { color:var(--muted); font-size:.74rem; letter-spacing:.04em; padding-bottom:8px; border-bottom:1px solid var(--ink); }
+  .overview { margin:14px 0 0; padding:10px 0; border-top:4px solid var(--ink); border-bottom:1px solid var(--ink); font-weight:700; }
+
+  /* ── 기사 목록 (세로 리스트 유지) ── */
+  .art { padding:22px 0 20px; border-bottom:1px solid var(--ink); scroll-margin-top:12px; }
+  .kicker { display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:.72rem; font-weight:700; letter-spacing:.05em; }
+  .kicker .blog { background:var(--ink); color:var(--paper); padding:2px 8px 3px; }
+  .kicker .info { color:var(--muted); font-weight:400; }
+  .art h3 { margin:10px 0 10px; font-weight:400; word-break:keep-all; overflow-wrap:anywhere;
+            font-family:"Black Han Sans","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+            font-size:clamp(1.45rem,3.4vw,2.05rem); line-height:1.2; }
+  .art.lead h3 { font-size:clamp(1.9rem,5.6vw,3.3rem); line-height:1.12; }
+  .art h3 a { text-decoration:none; }
+  .art h3 a:hover { text-decoration:underline; text-decoration-thickness:2px; }
+  .body { text-align:justify; font-size:.98rem; }
+  .body p { margin:0 0 .75em; }
+  .body.pre p { white-space:pre-line; text-align:left; }
+  .art.lead .body.sum > p:first-child::first-letter {
+    float:left; font-family:"Black Han Sans","Malgun Gothic",sans-serif; font-size:3.4em; line-height:.95; padding:.04em .1em 0 0; }
+  .tag { display:inline-block; margin-top:2px; padding:0 7px; border:1px solid var(--ink);
+         font-size:.66rem; font-weight:700; letter-spacing:.08em; }
+  .comment { margin:14px 0 4px; padding:10px 0 11px; border-top:4px solid var(--ink); border-bottom:1px solid var(--ink);
+             font-weight:700; font-size:1.02rem; line-height:1.6; white-space:pre-wrap; }
+  .more { margin-top:10px; font-size:.74rem; color:var(--muted); letter-spacing:.03em; }
+  .more a { color:var(--ink); font-weight:700; }
+
+  /* ── INDEX(지난 호) ── */
+  .index { border:4px solid var(--ink); padding:10px 14px 6px; position:sticky; top:14px; }
+  .index h4 { margin:0; font-weight:400; font-family:"Abril Fatface","Bodoni MT Black","Georgia",serif;
+              font-size:2.5rem; line-height:1; letter-spacing:.02em; }
+  .index .sub { font-size:.68rem; font-weight:700; letter-spacing:.3em; margin:2px 0 8px; }
+  .index ul { list-style:none; margin:0; padding:0; }
+  .index li a { display:flex; justify-content:space-between; align-items:center; gap:8px; text-decoration:none;
+                border-top:1px solid var(--ink); padding:6px 0; font-size:.8rem; font-weight:700; }
+  .index .n { background:var(--ink); color:var(--paper); min-width:2.3em; text-align:center; padding:0 6px; font-size:.72rem; }
+  .index li a:hover .d { text-decoration:underline; }
+  .index li a.on { background:var(--ink); color:var(--paper); padding:6px 8px; margin:0 -8px; }
+  .index li a.on .n { background:var(--paper); color:var(--ink); }
+
+  footer { margin-top:28px; padding-top:8px; border-top:3px double var(--ink); text-align:center;
+           font-size:.68rem; letter-spacing:.1em; color:var(--muted); }
   .empty { color:var(--muted); text-align:center; padding:60px 0; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>econews</h1>
-    <p>블로그 조간 · 석간 요약 신문</p>
+    <div class="topline sans"><span>블로그 조간 · 석간 요약 신문</span><span id="top-date"></span></div>
+    <div class="masthead"><h1 id="logo">econews</h1></div>
+    <div class="edition sans"><span id="ed-date"></span><span class="ed" id="ed-name"></span><span class="r" id="ed-count"></span></div>
+    <nav class="teasers sans" id="teasers"></nav>
   </header>
   <div class="layout">
     <main id="main"><div class="empty">불러오는 중…</div></main>
-    <aside><h4>지난 호</h4><ul id="archive"></ul></aside>
+    <aside>
+      <div class="index">
+        <h4>INDEX</h4>
+        <div class="sub sans">지난 호</div>
+        <ul id="archive" class="sans"></ul>
+      </div>
+    </aside>
   </div>
+  <footer class="sans">ECONEWS · 요약과 미리보기만 싣습니다 · 전문은 ‘원문 보기’로</footer>
 </div>
 <script>
 const ED = { am: "조간", pm: "석간" };
+const DOW = ["일","월","화","수","목","금","토"];
 const $ = (s) => document.querySelector(s);
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const rich = (t) => esc(t).replace(/~~(.+?)~~/g, "<s>$1</s>");  // 원문 취소선 표시
-const hm =(iso) => new Date(iso).toLocaleString("ko-KR", { timeZone:"Asia/Seoul", month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit", hour12:false });
+const hm = (iso) => new Date(iso).toLocaleString("ko-KR", { timeZone:"Asia/Seoul", month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit", hour12:false });
+const longDate = (d) => { const [y,m,dd] = d.split("-").map(Number); return `${y}년 ${m}월 ${dd}일 ${DOW[new Date(Date.UTC(y,m-1,dd)).getUTCDay()]}요일`; };
+const paras = (t) => String(t ?? "").split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
 
 async function getJSON(path) {
   const r = await fetch(path, { cache: "no-cache" });
   if (!r.ok) throw new Error(path + " " + r.status);
   return r.json();
+}
+
+// 제호를 화면 폭에 꽉 차게 맞춤
+function fitLogo() {
+  const el = $("#logo"), box = el.parentElement.clientWidth;
+  if (!box) return;
+  el.style.fontSize = "100px";
+  el.style.fontSize = Math.min(210, Math.floor(100 * box / el.offsetWidth)) + "px";
+}
+addEventListener("resize", fitLogo);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitLogo);
+fitLogo();
+
+function body(a) {
+  if (a.preview)
+    return `<div class="body pre"><p>${rich(a.preview)}</p></div><div class="tag sans">본문 미리보기</div>`;
+  const ps = paras(a.summary);
+  return `<div class="body sum">${ps.map(p => `<p>${esc(p)}</p>`).join("")}</div>
+          <div class="tag sans">${a.summary_by === "extractive" ? "핵심 문장 발췌" : "요약"}</div>`;
 }
 
 async function main() {
@@ -83,24 +162,28 @@ async function main() {
   const cur = index.find(e => e.id === wanted) || index[0];
 
   $("#archive").innerHTML = index.map(e =>
-    `<li><a href="?issue=${esc(e.id)}" class="${e.id === cur.id ? "on" : ""}">${esc(e.date)} ${ED[e.edition]} (${e.count})</a></li>`).join("");
+    `<li><a href="?issue=${esc(e.id)}" data-issue="${esc(e.id)}" class="${e.id === cur.id ? "on" : ""}"><span class="d">${esc(e.date.slice(5).replace("-", ". "))} ${ED[e.edition]}</span><span class="n">${e.count}</span></a></li>`).join("");
 
   const j = await getJSON(`data/issues/${cur.id}.json`);
-  const body = (a) => a.preview
-    ? `<p class="preview">${rich(a.preview)}</p><div class="tag">본문 미리보기</div>`
-    : `<p>${esc(a.summary)}</p>${a.summary_by === "extractive" ? `<div class="tag">핵심 문장 발췌</div>` : `<div class="tag">요약</div>`}`;
+  $("#top-date").textContent = j.date.replace(/-/g, ". ");
+  $("#ed-date").textContent = longDate(j.date);
+  $("#ed-name").textContent = ED[j.edition];
+  $("#ed-count").textContent = `총 ${j.articles.length}건`;
+  $("#teasers").innerHTML = j.articles.slice(1, 4).map((a, i) =>
+    `<a href="#a${i + 1}"><b>${esc(a.blog)}</b><span>${esc(a.title)}</span></a>`).join("");
+
   $("#main").innerHTML = `
-    <h2>${esc(j.date)} ${ED[j.edition]}</h2>
-    <div class="meta">${hm(j.window.from)} ~ ${hm(j.window.to)} 등록 글 · 총 ${j.articles.length}건</div>
+    <div class="meta sans">${hm(j.window.from)} ~ ${hm(j.window.to)} 등록 글</div>
     ${j.overview ? `<div class="overview">${esc(j.overview)}</div>` : ""}
-    ${j.articles.map(a => `
-      <article class="card">
-        <div class="blog">${esc(a.blog)}${a.length ? ` <span class="len">본문 ${a.length.toLocaleString()}자</span>` : ""}</div>
+    ${j.articles.map((a, i) => `
+      <article class="art${i === 0 ? " lead" : ""}" id="a${i}">
+        <div class="kicker sans"><span class="blog">${esc(a.blog)}</span><span class="info">${hm(a.published)}${a.length ? ` · 본문 ${a.length.toLocaleString()}자` : ""}</span></div>
         <h3><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a></h3>
         ${body(a)}
         ${a.comment ? `<div class="comment">${rich(a.comment)}</div>` : ""}
-        <div class="time">${hm(a.published)} · <a href="${esc(a.url)}" target="_blank" rel="noopener">원문 보기</a></div>
+        <div class="more sans"><a href="${esc(a.url)}" target="_blank" rel="noopener">원문 보기 →</a></div>
       </article>`).join("")}`;
+  fitLogo();
 }
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 main().catch(e => { $("#main").innerHTML = `<div class="empty">오류: ${esc(e.message)}</div>`; });
