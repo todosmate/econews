@@ -4,5 +4,7 @@
   { "id": "pillion21", "name": "알바트로스의 파생 이야기" },
   { "id": "pjws3", "name": "주부이야기" },
   { "id": "pokara61", "name": "포카라의 실전투자" },
-  { "id": "gentlenavy", "name": "젠네의 블로그" }
+  { "id": "gentlenavy", "name": "젠네의 블로그" },
+  { "id": "hyamc1", "name": "주식과 경제 공부 모임", "summarize": true },
+  { "id": "kmsmir04", "name": "깊고 향기롭게" }
 ]

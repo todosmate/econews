@@ -136,6 +136,7 @@ econews/
 - 참고: Gemini Flash 모델이 자주 503(과부하)을 반환 → 30초 뒤 1회 재시도 후 다음 모델(Flash-Lite까지)로 넘어감.
 
 - 2026-11-11: 일반 블로그 4개 추가(11-12 조간부터) — pillion21(알바트로스의 파생 이야기), pjws3(주부이야기), pokara61(포카라의 실전투자), gentlenavy(젠네의 블로그). 현재 총 6개, 요약은 ranto28만.
+- 2026-11-15: hyamc1(주식과 경제 공부 모임) 추가 — 요약 적용(`summarize: true`, 한줄 코멘트 마커 없음). kmsmir04(깊고 향기롭게) 일반 블로그로 추가. 11-15 조간부터. 현재 총 8개, 요약은 ranto28·hyamc1.
 
 - 2026-11-11: 휴대폰 지원 — PWA(docs/manifest.webmanifest, docs/sw.js 네트워크 우선, docs/icons/*.png, 홈 화면 추가 시 전체 화면).
   발행 알림은 ntfy.sh 사용: Secret `NTFY_TOPIC`(값은 공개 저장소에 기록하지 않음, 사용자에게만 전달). build_issue.py가 notify.json 생성 →
