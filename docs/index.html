@@ -169,7 +169,7 @@ fitLogo();
 
 function body(a) {
   if (a.preview)
-    return `<div class="body pre"><p>${rich(a.preview)}</p></div><div class="tag sans">본문 미리보기</div>`;
+    return `<div class="body pre"><p>${rich(a.preview)}</p></div>`;
   const ps = paras(a.summary);
   return `<div class="body sum">${ps.map(p => `<p>${esc(p)}</p>`).join("")}</div>
           <div class="tag sans">${a.summary_by === "extractive" ? "핵심 문장 발췌" : "요약"}</div>`;
