@@ -143,8 +143,6 @@ econews/
   maxOutputTokens 8192→16384, 요청 타임아웃 120→240초, 시간 초과 시 같은 모델 1회 재시도.
 - 참고: OneDrive 폴더에서 `git pull` 시 "unable to append to .git/logs" 오류 → `git config windows.appendAtomically false` (저장소 로컬 설정 완료).
 
-- 2026-11-16: 제호 우표 아이콘 — 기울기(-3deg) 제거, 톱니 포함 높이를 대문자 높이(CSS `1cap`, 미지원 시 .7em)에 맞추고 기준선 정렬.
-
 - 2026-11-11: 휴대폰 지원 — PWA(docs/manifest.webmanifest, docs/sw.js 네트워크 우선, docs/icons/*.png, 홈 화면 추가 시 전체 화면).
   발행 알림은 ntfy.sh 사용: Secret `NTFY_TOPIC`(값은 공개 저장소에 기록하지 않음, 사용자에게만 전달). build_issue.py가 notify.json 생성 →
   워크플로가 Pages 반영 90초 대기 후 전송. 알림 클릭 시 해당 호로 이동. 전송 동작 확인 완료.
@@ -152,6 +150,9 @@ econews/
 - 2026-11-12: 화면 디자인을 **종이 신문 스타일**로 변경 (docs/index.html만 교체, 데이터 형식·스크립트 변경 없음).
   큰 제호(ECONEWS) + 날짜/조간·석간 띠 + 예고 띠(그 호의 다른 글 2~3건) + 지난 호 INDEX 박스. 흑백(종이색/먹색), 다크 모드 지원.
   글 목록은 기존처럼 세로 리스트 유지, 본문은 화면 크기와 무관하게 **항상 1단** (사용자 요청). 글꼴은 Google Fonts(Abril Fatface, Black Han Sans, Noto Serif KR).
+
+- 2026-11-16: 제호 옆 우표 아이콘(홈 링크) 높이를 **ECONEWS 대문자 높이와 동일**하게 맞춤. 우표 바닥 = 글자 기준선.
+  fitLogo()가 실제 적용된 글꼴로 "E"의 높이를 측정해 `--cap`(우표 전체 높이)·`--tile`(톱니 간격, 구멍 수가 정수가 되게)을 설정 → 글꼴이 대체되어도 맞음.
 
 ## 10. blogs.json 설정 방법 (현행)
 ```json
