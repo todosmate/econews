@@ -105,9 +105,9 @@ econews/
 - [x] 저장소 https://github.com/todosmate/econews (공개) 생성 및 push, gh 로그인(workflow 권한 포함)
 - [x] Pages 설정 완료: main / docs → https://todosmate.github.io/econews/
 - [x] Actions 수동 실행으로 수집·필터·JSON 생성·커밋 동작 확인 (API 키 없이 발췌문 요약 상태)
-- [ ] **Settings → Secrets and variables → Actions → `ANTHROPIC_API_KEY` 등록** (미완료: 현재 요약이 발췌문으로 대체됨)
-- [ ] 키 등록 후 `gh workflow run publish-issue -f edition=am -f force=true` 로 Claude 요약 검증
-- [ ] 스케줄 동작 확인 (조간/석간 각 1회)
+- [x] ~~`ANTHROPIC_API_KEY` 등록 / Claude 요약 검증~~ → 불필요 (요약은 Gemini로 최종 결정, 9절 참고)
+- [x] 스케줄 동작 확인: 11-12 ~ 11-16 조간/석간 모두 schedule 트리거로 정상 발행 (cron 지연 약 30~45분)
+- [x] 2026-11-16: Gemini 요약 잘림 수정 (아래 9절)
 - [ ] (추후) 블로그 추가는 blogs.json에 한 줄 추가
 
 ## 8-1. 구현 메모
@@ -137,6 +137,11 @@ econews/
 
 - 2026-11-11: 일반 블로그 4개 추가(11-12 조간부터) — pillion21(알바트로스의 파생 이야기), pjws3(주부이야기), pokara61(포카라의 실전투자), gentlenavy(젠네의 블로그). 현재 총 6개, 요약은 ranto28만.
 - 2026-11-15: hyamc1(주식과 경제 공부 모임) 추가 — 요약 적용(`summarize: true`, 한줄 코멘트 마커 없음). kmsmir04(깊고 향기롭게) 일반 블로그로 추가. 11-15 조간부터. 현재 총 8개, 요약은 ranto28·hyamc1.
+
+- 2026-11-16: 11-16 조간 메르 글 요약이 문장 중간("머스크는 2026년 8월")에서 잘림. 원인: Gemini 응답의 `finishReason`을 확인하지 않아
+  MAX_TOKENS 등으로 잘린 응답을 그대로 사용. 수정: STOP이 아니면 재시도 → 다음 모델, 모두 잘리면 가장 긴 응답을 마지막 완결 문장까지 잘라 사용.
+  maxOutputTokens 8192→16384, 요청 타임아웃 120→240초, 시간 초과 시 같은 모델 1회 재시도.
+- 참고: OneDrive 폴더에서 `git pull` 시 "unable to append to .git/logs" 오류 → `git config windows.appendAtomically false` (저장소 로컬 설정 완료).
 
 - 2026-11-11: 휴대폰 지원 — PWA(docs/manifest.webmanifest, docs/sw.js 네트워크 우선, docs/icons/*.png, 홈 화면 추가 시 전체 화면).
   발행 알림은 ntfy.sh 사용: Secret `NTFY_TOPIC`(값은 공개 저장소에 기록하지 않음, 사용자에게만 전달). build_issue.py가 notify.json 생성 →

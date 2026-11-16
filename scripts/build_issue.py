@@ -182,7 +182,7 @@ class Gemini:
             f"{self.BASE}/{path}", data=json.dumps(payload).encode() if payload else None,
             method="POST" if payload else "GET",
             headers={"x-goog-api-key": self.key, "Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with urllib.request.urlopen(req, timeout=240) as r:
             return json.loads(r.read().decode())
 
     def _pick_models(self):
@@ -203,22 +203,39 @@ class Gemini:
                            [n for n in lst if "preview" in n or "exp" in n]
         return (pref(full)[:2] + pref(lite)[:2]) or ["gemini-flash-latest"]
 
+    @staticmethod
+    def _trim_to_sentence(text: str) -> str:
+        """잘린 응답을 마지막 완결 문장까지만 남긴다."""
+        ends = [m.end() for m in re.finditer(r"[.!?](?=\s|$)|\n", text)]
+        cut = ends[-1] if ends else 0
+        return text[:cut].strip() if cut > len(text) // 2 else text
+
     def ask(self, prompt: str) -> str:
-        last = None
+        last, partial = None, ""
         for m in list(self.models):
             for attempt in range(2):
                 t0 = time.time()
                 try:
                     j = self._req(f"models/{m}:generateContent", {
                         "contents": [{"parts": [{"text": prompt}]}],
-                        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 8192}})
-                    parts = j["candidates"][0]["content"]["parts"]
+                        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 16384}})
+                    cand = j["candidates"][0]
+                    finish = cand.get("finishReason", "STOP")
+                    parts = cand.get("content", {}).get("parts", [])
                     text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
-                    if text:
+                    if text and finish == "STOP":
                         print(f"    gemini {m}: {time.time() - t0:.0f}초, {len(text)}자")
                         time.sleep(5)  # 분당 한도 여유
                         return text
-                    last = f"{m}: 빈 응답 {str(j)[:200]}"
+                    if text:  # MAX_TOKENS 등으로 잘린 응답 → 재시도/다음 모델, 최후엔 문장 단위로 잘라 사용
+                        last = f"{m}: 잘린 응답({finish}, {len(text)}자)"
+                        print(f"    gemini {last} ({time.time() - t0:.0f}초)")
+                        if len(text) > len(partial):
+                            partial = text
+                        if attempt == 0:
+                            continue
+                        break
+                    last = f"{m}: 빈 응답({finish}) {str(j)[:200]}"
                     break
                 except urllib.error.HTTPError as e:
                     last = f"{m} HTTP {e.code}: {e.read()[:300]!r}"
@@ -232,7 +249,12 @@ class Gemini:
                 except Exception as e:  # noqa: BLE001
                     last = f"{m}: {e}"
                     print(f"    gemini {last[:200]} ({time.time() - t0:.0f}초)")
+                    if "timed out" in str(e) and attempt == 0:  # 시간 초과 → 같은 모델 1회 재시도
+                        continue
                     break
+        if partial:
+            print(f"    gemini 모든 시도가 잘림 → 문장 단위로 잘라 사용 ({len(partial)}자)")
+            return self._trim_to_sentence(partial)
         raise RuntimeError(last)
 
 
