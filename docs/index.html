@@ -36,6 +36,8 @@
   .masthead h1 { display:inline-block; margin:.04em 0 0; white-space:nowrap; font-weight:400;
                  font-family:"Abril Fatface","Bodoni MT Black","Didot","Georgia",serif;
                  font-size:17vw; line-height:.92; letter-spacing:.015em; text-transform:uppercase; }
+  .masthead .home { display:inline-block; margin-right:.12em; vertical-align:.08em; line-height:0; }
+  .masthead .home img { width:.62em; height:.62em; border-radius:.08em; display:block; }
   .edition { display:grid; grid-template-columns:1fr auto 1fr; align-items:end; gap:10px;
              padding:2px 0 8px; border-bottom:5px solid var(--ink);
              font-size:.72rem; font-weight:700; letter-spacing:.06em; }
@@ -102,7 +104,7 @@
 <div class="wrap">
   <header>
     <div class="topline sans"><span>블로그 조간 · 석간 요약 신문</span><span id="top-date"></span></div>
-    <div class="masthead"><h1 id="logo">econews</h1></div>
+    <div class="masthead"><h1 id="logo"><a class="home" href="https://todosmate.github.io/econews/" title="홈으로" aria-label="홈으로"><img src="icons/icon-192.png" alt=""></a>econews</h1></div>
     <div class="edition sans"><span id="ed-date"></span><span class="ed" id="ed-name"></span><span class="r" id="ed-count"></span></div>
     <nav class="teasers sans" id="teasers"></nav>
   </header>
